@@ -32,6 +32,7 @@ async function loadRemoteFood() {
     if (!response.ok) return;
     const listings = await response.json();
     remoteFood = listings.map(item => ({
+      id: item.id,
       title: item.title,
       type: item.food_type,
       emoji: item.food_type === 'produce' ? '🥗' : item.food_type === 'bakery' ? '🥖' : '🍱',
@@ -52,9 +53,15 @@ function renderFood() {
   grid.innerHTML = food.map(item => `
     <article class="food-card">
       <div class="food-photo ${item.type}"><span>${item.emoji}</span><span class="tag">${item.portions} portions</span>${item.verified ? '<span class="verified" title="Quantity verified">✓</span>' : ''}</div>
-      <div class="food-info"><h3>${item.title}</h3><div class="meta"><strong>${item.place}</strong><br />${item.time}<br /><span class="handoff-label">${item.handoff || 'Receiver collects'}</span></div><div class="card-bottom"><span class="distance">↗ ${item.distance}</span><button class="claim" data-claim="${item.title}">I can take this</button></div></div>
+      <div class="food-info"><h3>${item.title}</h3><div class="meta"><strong>${item.place}</strong><br />${item.time}<br /><span class="handoff-label">${item.handoff || 'Receiver collects'}</span></div><div class="card-bottom"><span class="distance">↗ ${item.distance}</span><button class="claim" data-claim-id="${item.id || ''}" data-claim="${item.title}">I can take this</button></div></div>
     </article>`).join('');
-  grid.querySelectorAll('[data-claim]').forEach(button => button.addEventListener('click', () => showToast(`Request sent for ${button.dataset.claim}`)));
+  grid.querySelectorAll('[data-claim]').forEach(button => button.addEventListener('click', () => claimListing(button.dataset.claimId, button.dataset.claim)));
+}
+async function claimListing(listingId, title) {
+  if (!currentSession) { toggleModal('#login-modal', true); showToast('Sign in before requesting food'); return; }
+  const response = await fetch('/api/claims', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${currentSession.access_token}` }, body: JSON.stringify({ listing_id: listingId }) });
+  if (!response.ok) { const error = await response.json().catch(() => ({})); showToast(error.error || 'Could not request this listing'); return; }
+  showToast(`Request sent for ${title}`);
 }
 function showToast(message) { toast.textContent = message; toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 3000); }
 function setModal(open) { modal.classList.toggle('open', open); modal.setAttribute('aria-hidden', String(!open)); if (open) modal.querySelector('input').focus(); }
