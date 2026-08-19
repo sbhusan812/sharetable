@@ -2,7 +2,12 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 function configured() {
-  return Boolean(supabaseUrl && serviceRoleKey);
+  return Boolean(
+    supabaseUrl &&
+    serviceRoleKey &&
+    !supabaseUrl.includes('your-project') &&
+    !serviceRoleKey.includes('replace-with')
+  );
 }
 
 async function supabase(path, options = {}) {
@@ -23,14 +28,15 @@ export default async function handler(request, response) {
     return;
   }
 
-  if (request.method === 'GET') {
-    const result = await supabase('listings?select=*&status=eq.available&order=created_at.desc');
-    const body = await result.text();
-    response.status(result.status).setHeader('Content-Type', 'application/json').send(body);
-    return;
-  }
+  try {
+    if (request.method === 'GET') {
+      const result = await supabase('listings?select=*&status=eq.available&order=created_at.desc');
+      const body = await result.text();
+      response.status(result.status).setHeader('Content-Type', 'application/json').send(body);
+      return;
+    }
 
-  if (request.method === 'POST') {
+    if (request.method === 'POST') {
     const token = request.headers.authorization?.replace('Bearer ', '');
     if (!token) {
       response.status(401).json({ error: 'Sign in is required to create a listing.' });
@@ -46,15 +52,15 @@ export default async function handler(request, response) {
     }
 
     const user = await userResult.json();
-    const body = request.body || {};
+    const requestBody = request.body || {};
     const listing = {
-      title: body.title,
-      food_type: body.food_type,
-      portions: Number(body.portions),
-      pickup_by: body.pickup_by,
-      handoff_method: body.handoff_method,
-      location_area: body.location_area,
-      details: body.details || null,
+      title: requestBody.title,
+      food_type: requestBody.food_type,
+      portions: Number(requestBody.portions),
+      pickup_by: requestBody.pickup_by,
+      handoff_method: requestBody.handoff_method,
+      location_area: requestBody.location_area,
+      details: requestBody.details || null,
       donor_id: user.id,
       status: 'available'
     };
@@ -67,10 +73,14 @@ export default async function handler(request, response) {
       headers: { Prefer: 'return=representation' },
       body: JSON.stringify(listing)
     });
-    const body = await result.text();
-    response.status(result.status).setHeader('Content-Type', 'application/json').send(body);
-    return;
-  }
+    const resultBody = await result.text();
+    response.status(result.status).setHeader('Content-Type', 'application/json').send(resultBody);
+      return;
+    }
 
-  response.status(405).setHeader('Allow', 'GET, POST').json({ error: 'Method not allowed.' });
+    response.status(405).setHeader('Allow', 'GET, POST').json({ error: 'Method not allowed.' });
+  } catch (error) {
+    console.error('Listings API error:', error);
+    response.status(502).json({ error: 'The listings database could not be reached.' });
+  }
 }

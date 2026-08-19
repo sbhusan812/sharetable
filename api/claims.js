@@ -14,7 +14,7 @@ async function supabase(path, options = {}) {
 }
 
 export default async function handler(request, response) {
-  if (!supabaseUrl || !serviceRoleKey) {
+  if (!supabaseUrl || !serviceRoleKey || supabaseUrl.includes('your-project') || serviceRoleKey.includes('replace-with')) {
     response.status(503).json({ error: 'Backend is not configured yet.' });
     return;
   }
@@ -42,11 +42,16 @@ export default async function handler(request, response) {
     return;
   }
   const user = await userResult.json();
-  const result = await supabase('claims', {
-    method: 'POST',
-    headers: { Prefer: 'return=representation' },
-    body: JSON.stringify({ listing_id: body.listing_id, receiver_id: user.id, status: 'requested' })
-  });
-  const resultBody = await result.text();
-  response.status(result.status).setHeader('Content-Type', 'application/json').send(resultBody);
+  try {
+    const result = await supabase('claims', {
+      method: 'POST',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ listing_id: body.listing_id, receiver_id: user.id, status: 'requested' })
+    });
+    const resultBody = await result.text();
+    response.status(result.status).setHeader('Content-Type', 'application/json').send(resultBody);
+  } catch (error) {
+    console.error('Claims API error:', error);
+    response.status(502).json({ error: 'The claims database could not be reached.' });
+  }
 }
