@@ -13,10 +13,33 @@ const grid = document.querySelector('#food-grid');
 const modal = document.querySelector('#modal');
 const toast = document.querySelector('#toast');
 let activeFilter = 'all';
+let remoteFood = null;
 
 function getFood() {
+  if (remoteFood) return remoteFood;
   try { return [...defaultFood, ...(JSON.parse(localStorage.getItem('sharetable-posts')) || [])]; }
   catch { return defaultFood; }
+}
+async function loadRemoteFood() {
+  try {
+    const response = await fetch('/api/listings');
+    if (!response.ok) return;
+    const listings = await response.json();
+    remoteFood = listings.map(item => ({
+      title: item.title,
+      type: item.food_type,
+      emoji: item.food_type === 'produce' ? '🥗' : item.food_type === 'bakery' ? '🥖' : '🍱',
+      portions: item.verified_portions || item.portions,
+      place: item.location_area,
+      time: `Pickup by ${new Date(item.pickup_by).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`,
+      handoff: item.handoff_method.replaceAll('_', ' '),
+      distance: 'nearby',
+      verified: Boolean(item.verified_at)
+    }));
+    renderFood();
+  } catch {
+    showToast('Showing demo listings while the backend is offline');
+  }
 }
 function renderFood() {
   const food = getFood().filter(item => activeFilter === 'all' || item.type === activeFilter);
@@ -75,3 +98,4 @@ document.querySelector('#volunteer-form').addEventListener('submit', event => { 
 document.querySelector('#verify-form').addEventListener('submit', event => { event.preventDefault(); toggleModal('#verify-modal', false); showToast('Verification saved to the listing history'); });
 document.querySelector('#bulk-form').addEventListener('submit', event => { event.preventDefault(); toggleModal('#bulk-modal', false); showToast('Verified NGOs near you have been notified'); });
 renderFood();
+loadRemoteFood();

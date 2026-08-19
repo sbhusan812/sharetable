@@ -11,6 +11,24 @@ This static site needs no build command on Vercel.
 
 Vercel will provide a public `.vercel.app` URL. Future GitHub pushes redeploy automatically.
 
+## Add the backend with Supabase
+
+1. Create a project at [supabase.com](https://supabase.com).
+2. In Supabase, open **SQL Editor**, paste the contents of `supabase/schema.sql`, and run it.
+3. In Supabase **Project Settings > API**, copy the project URL and the `service_role` key. Keep the service-role key private.
+4. In Vercel, open the ShareTable project and go to **Settings > Environment Variables**.
+5. Add these variables for Production, Preview, and Development:
+
+```text
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-server-only-service-role-key
+```
+
+6. Redeploy from Vercel's **Deployments** tab.
+7. Test `https://your-site.vercel.app/api/health`. It should return `{ "ok": true, "service": "sharetable-api" }`.
+
+The server-only key must only be used by Vercel API routes. Never put it in `index.html`, `app.js`, or a public repository file.
+
 # ShareTable
 
 A static prototype for redistributing surplus food to neighbours, NGOs, and volunteers.
