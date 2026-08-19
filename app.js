@@ -1,0 +1,77 @@
+const defaultFood = [
+  { title: 'Dal, rice & sabzi', type: 'meal', emoji: '🍲', portions: 12, place: 'The Green Plate', time: 'Pickup by 8:00 PM', distance: '0.4 km', verified: true },
+  { title: 'Fresh market produce', type: 'produce', emoji: '🥬', portions: 6, place: 'Maya’s Kitchen', time: 'Good for 2 days', distance: '0.8 km', verified: true },
+  { title: 'Sourdough loaves', type: 'bakery', emoji: '🍞', portions: 8, place: 'Common Ground Café', time: 'Pickup by 6:30 PM', distance: '1.1 km', verified: true },
+  { title: 'Paneer wraps', type: 'meal', emoji: '🌯', portions: 5, place: 'Rhea S.', time: 'Meet by 7:00 PM', distance: '1.4 km', verified: false },
+  { title: 'Lemon rice & curd', type: 'meal', emoji: '🍚', portions: 9, place: 'Ananya’s Home', time: 'Pickup by 9:00 PM', distance: '1.7 km', verified: true },
+  { title: 'Banana & citrus box', type: 'produce', emoji: '🍌', portions: 10, place: 'Fresh Basket Co.', time: 'Good for 3 days', distance: '2.0 km', verified: true },
+  { title: 'Veggie puffs', type: 'bakery', emoji: '🥐', portions: 7, place: 'Miette Bakery', time: 'Pickup by 5:30 PM', distance: '2.2 km', verified: true },
+  { title: 'Chickpea curry', type: 'meal', emoji: '🥘', portions: 15, place: 'Sanjay K.', time: 'Delivery available', distance: '2.6 km', verified: false }
+];
+
+const grid = document.querySelector('#food-grid');
+const modal = document.querySelector('#modal');
+const toast = document.querySelector('#toast');
+let activeFilter = 'all';
+
+function getFood() {
+  try { return [...defaultFood, ...(JSON.parse(localStorage.getItem('sharetable-posts')) || [])]; }
+  catch { return defaultFood; }
+}
+function renderFood() {
+  const food = getFood().filter(item => activeFilter === 'all' || item.type === activeFilter);
+  grid.innerHTML = food.map(item => `
+    <article class="food-card">
+      <div class="food-photo ${item.type}"><span>${item.emoji}</span><span class="tag">${item.portions} portions</span>${item.verified ? '<span class="verified" title="Quantity verified">✓</span>' : ''}</div>
+      <div class="food-info"><h3>${item.title}</h3><div class="meta"><strong>${item.place}</strong><br />${item.time}<br /><span class="handoff-label">${item.handoff || 'Receiver collects'}</span></div><div class="card-bottom"><span class="distance">↗ ${item.distance}</span><button class="claim" data-claim="${item.title}">I can take this</button></div></div>
+    </article>`).join('');
+  grid.querySelectorAll('[data-claim]').forEach(button => button.addEventListener('click', () => showToast(`Request sent for ${button.dataset.claim}`)));
+}
+function showToast(message) { toast.textContent = message; toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 3000); }
+function setModal(open) { modal.classList.toggle('open', open); modal.setAttribute('aria-hidden', String(!open)); if (open) modal.querySelector('input').focus(); }
+function setSupportModal(open) { const supportModal = document.querySelector('#support-modal'); supportModal.classList.toggle('open', open); supportModal.setAttribute('aria-hidden', String(!open)); if (open) supportModal.querySelector('input').focus(); }
+function toggleModal(id, open) { const target = document.querySelector(id); target.classList.toggle('open', open); target.setAttribute('aria-hidden', String(!open)); if (open) target.querySelector('input').focus(); }
+
+document.querySelectorAll('[data-filter]').forEach(button => button.addEventListener('click', () => { activeFilter = button.dataset.filter; document.querySelectorAll('[data-filter]').forEach(item => item.classList.toggle('active', item === button)); renderFood(); }));
+document.querySelectorAll('[data-open-modal]').forEach(button => button.addEventListener('click', () => setModal(true)));
+document.querySelector('[data-close-modal]').addEventListener('click', () => setModal(false));
+modal.addEventListener('click', event => { if (event.target === modal) setModal(false); });
+document.querySelectorAll('[data-open-support]').forEach(button => button.addEventListener('click', () => setSupportModal(true)));
+document.querySelector('[data-close-support]').addEventListener('click', () => setSupportModal(false));
+const supportModal = document.querySelector('#support-modal');
+supportModal.addEventListener('click', event => { if (event.target === supportModal) setSupportModal(false); });
+document.addEventListener('keydown', event => { if (event.key === 'Escape') { setModal(false); setSupportModal(false); } });
+document.querySelector('#share-form').addEventListener('submit', event => {
+  event.preventDefault();
+  const data = new FormData(event.target);
+  const post = { title: data.get('title'), type: data.get('type'), emoji: data.get('type') === 'produce' ? '🥗' : data.get('type') === 'bakery' ? '🥖' : '🍱', portions: data.get('portions'), place: 'Your shared kitchen', time: data.get('time'), handoff: data.get('handoff'), distance: '0.0 km', verified: false };
+  const posts = JSON.parse(localStorage.getItem('sharetable-posts') || '[]');
+  localStorage.setItem('sharetable-posts', JSON.stringify([post, ...posts]));
+  setModal(false); event.target.reset(); activeFilter = 'all'; document.querySelectorAll('[data-filter]').forEach(item => item.classList.toggle('active', item.dataset.filter === 'all')); renderFood(); showToast('Your surplus is live and pending verification');
+});
+document.querySelector('#support-form').addEventListener('submit', event => {
+  event.preventDefault();
+  const data = new FormData(event.target);
+  const amount = data.get('amount') === 'custom' ? data.get('customAmount') : data.get('amount');
+  if (!amount || Number(amount) < 1) { showToast('Enter a contribution amount to continue'); return; }
+  const frequency = document.querySelector('input[name="frequency"]:checked').value === 'monthly' ? 'monthly support' : 'one-time support';
+  setSupportModal(false); event.target.reset(); showToast(`Thank you. Payment setup is ready for ₹${amount} ${frequency}`);
+});
+document.querySelectorAll('[data-open-login]').forEach(button => button.addEventListener('click', () => toggleModal('#login-modal', true)));
+document.querySelector('[data-close-login]').addEventListener('click', () => toggleModal('#login-modal', false));
+document.querySelector('#login-modal').addEventListener('click', event => { if (event.target.id === 'login-modal') toggleModal('#login-modal', false); });
+document.querySelectorAll('[data-open-volunteer]').forEach(button => button.addEventListener('click', () => { toggleModal('#login-modal', false); toggleModal('#volunteer-modal', true); }));
+document.querySelector('[data-close-volunteer]').addEventListener('click', () => toggleModal('#volunteer-modal', false));
+document.querySelector('#volunteer-modal').addEventListener('click', event => { if (event.target.id === 'volunteer-modal') toggleModal('#volunteer-modal', false); });
+document.querySelector('[data-open-bulk]').addEventListener('click', () => toggleModal('#bulk-modal', true));
+document.querySelector('[data-close-bulk]').addEventListener('click', () => toggleModal('#bulk-modal', false));
+document.querySelector('#bulk-modal').addEventListener('click', event => { if (event.target.id === 'bulk-modal') toggleModal('#bulk-modal', false); });
+document.querySelectorAll('[data-bulk-claim]').forEach(button => button.addEventListener('click', () => showToast(`NGO request started for ${button.dataset.bulkClaim}`)));
+document.querySelector('[data-open-verify]')?.addEventListener('click', () => toggleModal('#verify-modal', true));
+document.querySelector('[data-close-verify]')?.addEventListener('click', () => toggleModal('#verify-modal', false));
+document.querySelector('#verify-modal').addEventListener('click', event => { if (event.target.id === 'verify-modal') toggleModal('#verify-modal', false); });
+document.querySelector('#login-form').addEventListener('submit', event => { event.preventDefault(); toggleModal('#login-modal', false); showToast('Demo sign-in complete. Verification status: basic member'); });
+document.querySelector('#volunteer-form').addEventListener('submit', event => { event.preventDefault(); toggleModal('#volunteer-modal', false); showToast('Application sent. We will review your identity and references.'); });
+document.querySelector('#verify-form').addEventListener('submit', event => { event.preventDefault(); toggleModal('#verify-modal', false); showToast('Verification saved to the listing history'); });
+document.querySelector('#bulk-form').addEventListener('submit', event => { event.preventDefault(); toggleModal('#bulk-modal', false); showToast('Verified NGOs near you have been notified'); });
+renderFood();
